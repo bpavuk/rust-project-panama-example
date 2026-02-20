@@ -3,6 +3,7 @@ package org.example.app
 import org.example.interop.ExternStruct
 import org.example.interop.RustApi
 import org.example.interop.jvm_interop_h
+import java.lang.foreign.Arena
 
 // if IDEA or Kotlin LSP is scared, run ./gradlew :interop-panama:generateJextractBindings.
 // jvm_interop_h is a jextract-generated class.
@@ -17,4 +18,13 @@ fun main() {
     val yFromRust = ExternStruct.y(struct)
     println("Rust owns these. x: $xFromRust, y: $yFromRust. also, xy = nice!")
     jvm_interop_h.extern_struct_free(struct) // remember to clean after yourself!
+
+    // or we can rely on automatic scope-based resource management
+    val arena = Arena.ofConfined()
+    arena.use { arena ->
+        val struct2 = ExternStruct.allocate(arena)
+        ExternStruct.x(struct2, 1234)
+        ExternStruct.y(struct2, 103)
+        println("${ExternStruct.x(struct2) + ExternStruct.y(struct2)} using automated cleanup")
+    }
 }
