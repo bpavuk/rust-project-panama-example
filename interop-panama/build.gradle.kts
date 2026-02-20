@@ -8,7 +8,12 @@ plugins {
     id("java")
 }
 
-val rustProjectDir = rootProject.layout.projectDirectory.dir("src-rust")
+val rustSources = objects.sourceDirectorySet("rust", "Rust sources").apply {
+    srcDir("src/main/rust")
+    include("**/*.rs", "Cargo.toml", "Cargo.lock")
+}
+
+val rustProjectDir = layout.projectDirectory.dir("src/main/rust")
 val rustTargetDir = rustProjectDir.dir("target/debug")
 val rustHeadersDir = rustProjectDir.dir("bindings")
 val jextractOutputDir = layout.buildDirectory.dir("generated/jextract")
@@ -25,6 +30,8 @@ val buildRustCdylib by tasks.registering(Exec::class) {
     description = "Build src-rust cdylib with Cargo"
     workingDir = rustProjectDir.asFile
     commandLine("cargo", "build")
+    inputs.files(rustSources)
+    outputs.dir(layout.projectDirectory.dir("src/main/rust/target"))
 }
 
 val copyRustLib by tasks.registering(Copy::class) {
@@ -33,6 +40,8 @@ val copyRustLib by tasks.registering(Copy::class) {
     dependsOn(buildRustCdylib)
     from(rustTargetDir.file(rustLibFileName))
     into(layout.buildDirectory.dir("native"))
+    inputs.dir(rustTargetDir)
+    outputs.dir(layout.buildDirectory.dir("native"))
 }
 
 val copyHeaders by tasks.registering(Copy::class) {
@@ -41,6 +50,8 @@ val copyHeaders by tasks.registering(Copy::class) {
     dependsOn(buildRustCdylib)
     from(rustHeadersDir.file("jvm_interop.h"))
     into(layout.buildDirectory.dir("native"))
+    inputs.dir(rustHeadersDir)
+    outputs.dir(layout.buildDirectory.dir("native"))
 }
 
 // HACK: I'd rather interact with jextract as a build-time dependency, much like
@@ -52,6 +63,7 @@ val generateJextractBindings by tasks.registering(Exec::class) {
     dependsOn(copyRustLib, copyHeaders)
     val nativeDir = layout.buildDirectory.dir("native").get().asFile
     val nativeLibPath = layout.buildDirectory.dir("native").get().file(rustLibFileName).get().asFile.absolutePath
+    inputs.dir(nativeDir)
     outputs.dir(jextractOutputDir)
     commandLine(
         "jextract",
